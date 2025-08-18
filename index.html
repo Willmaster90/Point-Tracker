@@ -1,0 +1,1513 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Class Points Tracker - Version 9</title>
+
+<!-- SortableJS CDN (for drag & drop reordering) -->
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.0/Sortable.min.js"></script>
+
+<style>
+:root{
+  --primary:#2d6cdf;
+  --danger:#dc3545;
+  --muted:#6c757d;
+  --card-bg:#ffffff;
+  --app-bg:#f6f8fa;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;
+  font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  background:var(--app-bg);
+  display:flex;
+  flex-direction:column;
+  min-height:100vh;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+/* header */
+header{
+  background:rgba(255,255,255,0.9);
+  backdrop-filter: blur(4px);
+  padding:12px 18px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  box-shadow:0 2px 4px rgba(0,0,0,0.06);
+  position:sticky;
+  top:0;
+  z-index:10;
+}
+header h1{margin:0;color:var(--primary);font-size:1.15rem;cursor:pointer}
+header .right{display:flex;gap:10px;align-items:center}
+.logo{height:44px;width:auto;border-radius:6px;cursor:pointer}
+
+/* add bar */
+#add-bar{
+  background:rgba(255,255,255,0.9);
+  padding:12px 16px;
+  margin:12px;
+  border-radius:10px;
+  display:flex;
+  gap:8px;
+  align-items:center;
+  box-shadow:0 2px 6px rgba(15,15,15,0.03);
+  flex-wrap:wrap;
+}
+#add-bar input[type="text"]{flex:1;min-width:160px;padding:8px;border:1px solid #dfe3ea;border-radius:6px}
+#add-bar select{padding:8px;border-radius:6px;border:1px solid #dfe3ea}
+#add-bar input[type="file"]{padding:6px}
+#add-bar button{background:var(--primary);color:white;border:none;padding:8px 10px;border-radius:6px;cursor:pointer}
+
+/* widgets container */
+#widgets-container{
+  display:flex;
+  flex-wrap:wrap;
+  gap:12px;
+  padding:0 18px 12px 18px;
+  max-width:1280px;
+  margin:0 auto;
+}
+.widget{
+  background:rgba(255,255,255,0.9);
+  border-radius:10px;
+  padding:12px;
+  box-shadow:0 2px 6px rgba(15,15,15,0.03);
+  flex:1 1 260px;
+  min-width:230px;
+}
+.widget h3{
+  margin:0 0 8px 0;
+  font-size:1rem;
+  color:var(--primary);
+}
+.widget .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.widget .btn{background:var(--primary);color:#fff;border:none;border-radius:8px;padding:8px 10px;cursor:pointer}
+.widget input[type="number"]{width:84px;padding:6px;border:1px solid #e0e6ee;border-radius:8px}
+.widget .display{
+  font-variant-numeric: tabular-nums;
+  font-weight:700;
+  font-size:1.25rem;
+  background:#fff;
+  border:1px solid #e9eef7;
+  padding:8px 10px;border-radius:8px;
+}
+
+/* grid */
+#student-list{
+  padding:18px;
+  display:grid;
+  gap:16px;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  align-items:start;
+  width:100%;
+  max-width:1280px;
+  margin:0 auto 24px auto;
+  flex:1;
+}
+
+/* square card */
+.student-card{
+  background:var(--card-bg);
+  border-radius:12px;
+  box-shadow:0 4px 10px rgba(20,20,20,0.04);
+  position:relative;
+  padding:10px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:space-between;
+  aspect-ratio:1/1;
+  cursor:pointer;
+  overflow:hidden;
+  transition: transform 160ms ease, box-shadow 160ms ease;
+}
+.student-card.dragging{
+  opacity:0.85;
+  transform: scale(1.02);
+  box-shadow:0 10px 30px rgba(0,0,0,0.12);
+}
+.student-card .card-inner{display:flex;flex-direction:column;align-items:center;gap:8px;justify-content:center;height:100%;width:100%}
+
+.student-card img.avatar{
+  width:64%;
+  max-width:120px;
+  height:auto;
+  aspect-ratio:1/1;
+  object-fit:cover;
+  border-radius:50%;
+  border:4px solid white;
+  box-shadow:0 2px 8px rgba(0,0,0,0.08);
+  cursor:pointer;
+}
+
+.student-name{
+  margin-top:6px;
+  font-weight:600;
+  text-align:center;
+  word-break:break-word;
+  font-size:0.95rem;
+  cursor:pointer;
+}
+
+/* drag handle */
+.drag-handle{
+  position:absolute;
+  left:8px; top:8px;
+  font-size:18px;
+  color:var(--muted);
+  cursor:grab;
+  user-select:none;
+  padding:6px;
+  border-radius:6px;
+}
+.drag-handle:active{ cursor:grabbing; }
+
+/* points badge */
+.points-badge{
+  position:absolute;
+  top:10px;
+  right:10px;
+  background:var(--primary);
+  color:white;
+  width:36px;height:36px;
+  border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-weight:700;font-size:0.95rem;
+  box-shadow:0 2px 6px rgba(0,0,0,0.12);
+}
+
+/* footer */
+footer{
+  text-align:center;padding:10px;background:rgba(255,255,255,0.9);font-size:0.9rem;
+  border-top:1px solid rgba(0,0,0,0.03);
+}
+
+/* modal */
+.modal{
+  position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,0.45);z-index:40;
+}
+.modal.open{display:flex}
+.modal-card{
+  width:96%;max-width:920px;background:white;border-radius:10px;padding:18px;box-shadow:0 10px 30px rgba(0,0,0,0.18);
+  max-height:90vh;overflow:auto;
+}
+
+/* point modal */
+.point-head{display:flex;gap:16px;align-items:center}
+.point-head img{width:86px;height:86px;border-radius:50%;object-fit:cover;border:4px solid white;box-shadow:0 4px 12px rgba(0,0,0,0.08)}
+.point-head .meta{display:flex;flex-direction:column;gap:6px}
+.point-head .meta h2{margin:0;font-size:1.1rem}
+.point-head .meta p{margin:0;color:#666}
+.categories-grid{
+  display:grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap:10px;margin-top:12px;
+}
+.cat-btn{
+  display:flex;align-items:center;justify-content:space-between;padding:10px;border-radius:8px;background:#f7fafc;border:1px solid #eef2f7;
+  cursor:pointer;font-weight:700;
+  transition: transform 120ms ease;
+}
+.cat-btn:active{ transform: translateY(2px); }
+.cat-label{display:flex;flex-direction:column;align-items:flex-start}
+.cat-label small{color:#666;font-weight:600}
+.cat-value{font-weight:900;padding:6px 10px;border-radius:8px;background:var(--primary);color:white}
+
+/* edit modal */
+.edit-row{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
+.edit-row input[type="text"]{flex:1;padding:8px;border:1px solid #e0e6ee;border-radius:8px}
+.edit-row input[type="file"]{padding:6px}
+.tiny{font-size:0.85rem;color:#555}
+
+/* category editor */
+.cat-editor{margin-top:12px}
+.cat-editor .row{display:flex;gap:8px;align-items:center;margin-bottom:8px}
+.cat-editor input[type="text"], .cat-editor input[type="number"]{padding:8px;border:1px solid #e6ecf5;border-radius:8px}
+.cat-editor .remove{background:#f8d7da;border:1px solid #f5c6cb;color:#721c24;padding:6px 8px;border-radius:8px;cursor:pointer}
+.btn-primary{background:var(--primary);color:white;padding:8px 12px;border-radius:8px;border:none;cursor:pointer}
+.btn-danger{background:var(--danger);color:white;padding:8px 12px;border-radius:8px;border:none;cursor:pointer}
+
+/* emoji picker */
+.emoji-grid{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.emoji-tile{width:44px;height:44px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:22px;background:#fff;border:1px solid #eee;cursor:pointer}
+.emoji-tile.selected{outline:3px solid rgba(45,108,223,0.25);transform:translateY(-2px)}
+
+/* small screens */
+@media (max-width:480px){
+  .categories-grid{grid-template-columns:repeat(1,1fr)}
+  #student-list{gap:10px;padding:12px}
+}
+
+/* v9 background icon choices */
+.bg-choices{ display:flex; flex-wrap:wrap; gap:8px; align-items:center }
+.bg-choice{ display:inline-flex; align-items:center; gap:8px; padding:6px 10px; border:1px solid #ccc; border-radius:10px; cursor:pointer; background:#fff }
+.bg-choice[aria-checked="true"]{ outline:2px solid #333 }
+.bg-choice:focus{ outline:2px solid #666 }
+.bg-choice .swatch{ width:18px; height:18px; border-radius:50%; border:1px solid #bbb; display:inline-block }
+.bg-choice .bg-name{ font-size:12px }
+
+</style>
+</head>
+<body>
+
+<header>
+  <h1 id="class-title">Class Points Tracker</h1>
+  <div class="right">
+    <button id="open-class-management" style="background:#eee;border:none;padding:8px 10px;border-radius:8px;cursor:pointer">Class Management</button>
+    <img id="header-logo" src="https://via.placeholder.com/110x44?text=Logo" alt="Logo" class="logo">
+  </div>
+</header>
+
+<!-- add bar -->
+<div id="add-bar">
+  <input id="new-name" type="text" placeholder="New student name (required)">
+  <select id="new-gender" title="Gender">
+    <option value="boy">Boy</option>
+    <option value="girl">Girl</option>
+    <option value="other">Other</option>
+  </select>
+  <input id="new-image" type="file" accept="image/*">
+  <div style="display:flex;align-items:center;gap:8px">
+    <span class="tiny">Or pick an emoji:</span>
+    <div id="add-emoji-grid" class="emoji-grid" style="margin-left:6px"></div>
+  </div>
+  <button onclick="addStudent()">Add Student</button>
+</div>
+
+<!-- widgets container -->
+<div id="widgets-container"></div>
+
+<!-- grid -->
+<main id="student-list" aria-live="polite"></main>
+
+<footer>Created by William Lau - Version 9</footer>
+
+<!-- Point Menu Modal -->
+<div id="point-modal" class="modal" role="dialog" aria-hidden="true">
+  <div class="modal-card" role="document">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h2 style="margin:0">Point Menu</h2>
+      <div style="display:flex;gap:8px">
+        <button class="btn-primary" id="point-open-edit">Edit</button>
+        <button onclick="closePointModal()" style="background:#eee;border-radius:8px;padding:8px 10px;border:none;cursor:pointer">Close</button>
+      </div>
+    </div>
+
+    <div style="margin-top:12px">
+      <div class="point-head">
+        <img id="modal-avatar" src="" alt="avatar">
+        <div class="meta">
+          <h2 id="modal-name">Student Name</h2>
+          <p id="modal-points" class="tiny">0 points</p>
+          <p class="tiny">Click a category to add/deduct points</p>
+        </div>
+      </div>
+
+      <div class="categories-grid" id="modal-categories"></div>
+
+      <h3 style="margin-top:14px">History</h3>
+      <ul id="modal-history" style="max-height:220px;overflow:auto;padding-left:18px"></ul>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Student Modal -->
+<div id="edit-modal" class="modal" role="dialog" aria-hidden="true">
+  <div class="modal-card">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h2 style="margin:0">Edit Student</h2>
+      <div style="display:flex;gap:8px">
+        <button onclick="saveStudentEdits()" class="btn-primary">Save</button>
+        <button onclick="closeEditModal()" style="background:#eee;border-radius:8px;padding:8px 10px;border:none;cursor:pointer">Cancel</button>
+      </div>
+    </div>
+
+    <div style="margin-top:12px">
+      <div class="edit-row">
+        <img id="edit-avatar" src="" alt="" style="width:72px;height:72px;border-radius:50%;object-fit:cover;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,0.08)">
+        <input id="edit-name" type="text" placeholder="Student name">
+        <select id="edit-gender">
+          <option value="boy">Boy</option>
+          <option value="girl">Girl</option>
+          <option value="other">Other</option>
+        </select>
+        <input id="edit-image" type="file" accept="image/*">
+      </div>
+
+      <div style="margin-top:8px">
+        <div class="tiny">Or pick an emoji for this student:</div>
+        <div id="edit-emoji-grid" class="emoji-grid"></div>
+      </div>
+
+      
+<div class="edit-row">
+  <label style="min-width:140px">Background colour</label>
+  <div id="edit-bg-choices" class="bg-choices" role="radiogroup" aria-label="Background colour">
+    <button type="button" class="bg-choice" data-value="white" role="radio" aria-checked="false" tabindex="0">
+      <span class="swatch" style="background:#ffffff"></span><span class="bg-name">White</span>
+    </button>
+    <button type="button" class="bg-choice" data-value="blue" role="radio" aria-checked="false" tabindex="-1">
+      <span class="swatch" style="background:#e7f0ff"></span><span class="bg-name">Blue</span>
+    </button>
+    <button type="button" class="bg-choice" data-value="green" role="radio" aria-checked="false" tabindex="-1">
+      <span class="swatch" style="background:#eaf7ea"></span><span class="bg-name">Green</span>
+    </button>
+    <button type="button" class="bg-choice" data-value="red" role="radio" aria-checked="false" tabindex="-1">
+      <span class="swatch" style="background:#ffefef"></span><span class="bg-name">Red</span>
+    </button>
+    <button type="button" class="bg-choice" data-value="yellow" role="radio" aria-checked="false" tabindex="-1">
+      <span class="swatch" style="background:#fffbe6"></span><span class="bg-name">Yellow</span>
+    </button>
+    <button type="button" class="bg-choice" data-value="purple" role="radio" aria-checked="false" tabindex="-1">
+      <span class="swatch" style="background:#f3e8ff"></span><span class="bg-name">Purple</span>
+    </button>
+    <button type="button" class="bg-choice" data-value="orange" role="radio" aria-checked="false" tabindex="-1">
+      <span class="swatch" style="background:#fff1e6"></span><span class="bg-name">Orange</span>
+    </button>
+    <button type="button" class="bg-choice" data-value="gold" role="radio" aria-checked="false" tabindex="-1">
+      <span class="swatch" style="background:#fff4cc"></span><span class="bg-name">Gold</span>
+    </button>
+  </div>
+</div>
+
+
+      <section class="cat-editor">
+        <h3 style="margin:8px 0">Point Categories (this student)</h3>
+        <div id="cat-list"></div>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <input id="new-cat-name" type="text" placeholder="Category name">
+          <input id="new-cat-value" type="number" placeholder="Value" style="width:100px">
+          <button onclick="addCategoryToStudent()" class="btn-primary">Add Category</button>
+        </div>
+      </section>
+
+      <div style="margin-top:14px;display:flex;gap:8px;align-items:center">
+        <button onclick="deleteCurrentStudent()" class="btn-danger">Delete Student</button>
+        <div style="flex:1"></div>
+        <button onclick="closeEditModal()" style="background:#eee;border-radius:8px;padding:8px 10px;border:none;cursor:pointer">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Class Management Modal -->
+<div id="class-mgmt-modal" class="modal" role="dialog" aria-hidden="true">
+  <div class="modal-card">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h2 style="margin:0">Class Management</h2>
+      <div>
+        <button onclick="closeClassManagement()" style="background:#eee;border-radius:8px;padding:8px 10px;border:none;cursor:pointer">Close</button>
+      </div>
+    </div>
+
+    <div style="margin-top:12px;display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button onclick="resetAllPoints()" class="btn-primary">Reset All Points</button>
+        <button onclick="openManageCategories()" style="background:#f0f6ff;border-radius:8px;padding:8px 10px;border:none;cursor:pointer">Manage Global Categories</button>
+        <button onclick="openGivePointsGroup()" style="background:#fff;border:1px solid #dfe6f6;border-radius:8px;padding:8px 10px;cursor:pointer">Give Points to Group</button>
+        <button onclick="openSettings()" style="background:#fff;border:1px solid #dfe6f6;border-radius:8px;padding:8px 10px;cursor:pointer">Settings</button>
+        <button onclick="openManageEmojis()" style="background:#fff;border:1px solid #dfe6f6;border-radius:8px;padding:8px 10px;cursor:pointer">Manage Emoji Avatars</button>
+      </div>
+
+      <div style="padding:10px;border-radius:8px;background:#fbfdff;border:1px solid #eef2fb">
+        <p class="tiny">Global categories are copied into each student when they are created. Editing a student's categories won't change global ones. Emoji avatars are managed here and available when creating or editing students.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Manage Global Categories Modal -->
+<div id="global-cat-modal" class="modal" role="dialog" aria-hidden="true">
+  <div class="modal-card">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h2 style="margin:0">Global Categories</h2>
+      <div style="display:flex;gap:8px">
+        <button onclick="saveGlobalCategories()" class="btn-primary">Save</button>
+        <button onclick="closeGlobalCategories()" style="background:#eee;border-radius:8px;padding:8px 10px;border:none;cursor:pointer">Cancel</button>
+      </div>
+    </div>
+
+    <div style="margin-top:12px">
+      <p class="tiny">Edit categories that will be used as defaults for new students.</p>
+      <div id="global-cat-list" style="margin-top:8px"></div>
+
+      <div style="display:flex;gap:8px;margin-top:10px">
+        <input id="global-new-name" type="text" placeholder="Category name">
+        <input id="global-new-value" type="number" placeholder="Value" style="width:100px">
+        <button onclick="addGlobalCategory()" class="btn-primary">Add Global Category</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Give Points to Group Modal -->
+<div id="give-group-modal" class="modal" role="dialog" aria-hidden="true">
+  <div class="modal-card">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h2 style="margin:0">Give Points to Group</h2>
+      <div>
+        <button onclick="closeGivePointsGroup()" style="background:#eee;border-radius:8px;padding:8px 10px;border:none;cursor:pointer">Close</button>
+      </div>
+    </div>
+
+    <div style="margin-top:12px;display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;gap:8px;align-items:center">
+        <label style="min-width:110px">Target</label>
+        <select id="group-target">
+          <option value="all">All students</option>
+          <option value="boy">Boys only</option>
+          <option value="girl">Girls only</option>
+        </select>
+      </div>
+
+      <div style="display:flex;gap:8px;align-items:center">
+        <label style="min-width:110px">Category</label>
+        <select id="group-category"></select>
+      </div>
+
+      <div style="display:flex;gap:8px;align-items:center">
+        <label style="min-width:110px">Times</label>
+        <input id="group-times" type="number" min="1" value="1" style="width:100px">
+        <button class="btn-primary" onclick="applyPointsToGroup()">Apply</button>
+      </div>
+
+      <p class="tiny">This will add the category value (may be negative) to each selected student, repeated by 'Times'.</p>
+    </div>
+  </div>
+</div>
+
+<!-- Settings Modal -->
+<div id="settings-modal" class="modal" role="dialog" aria-hidden="true">
+  <div class="modal-card">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h2 style="margin:0">Settings</h2>
+      <div>
+        <button onclick="closeSettings()" style="background:#eee;border-radius:8px;padding:8px 10px;border:none;cursor:pointer">Close</button>
+      </div>
+    </div>
+
+    <div style="margin-top:12px;display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;gap:8px;align-items:center">
+        <label style="min-width:120px">Class Heading</label>
+        <input id="setting-title" type="text" placeholder="Class title">
+      </div>
+
+      <div style="display:flex;gap:8px;align-items:center">
+        <label style="min-width:120px">Logo</label>
+        <input id="setting-logo" type="file" accept="image/*">
+        <img id="preview-logo" src="" alt="logo preview" style="height:44px;border-radius:6px;object-fit:contain">
+      </div>
+
+      <div style="display:flex;gap:8px;align-items:center">
+        <label style="min-width:120px">Background</label>
+        <input id="setting-bg" type="file" accept="image/*">
+        <button onclick="clearBackground()" style="background:#fff;border:1px solid #ddd;padding:8px;border-radius:8px;cursor:pointer">Remove Background</button>
+      </div>
+
+      <!-- New: Widgets toggles -->
+      <div style="margin-top:8px;padding:10px;border-radius:10px;background:#fbfdff;border:1px solid #eef2fb">
+        <h3 style="margin:0 0 8px 0;font-size:1rem;color:var(--primary)">Widgets</h3>
+        <div class="tiny" style="margin-bottom:8px">Choose which widgets appear above the student grid.</div>
+        <div style="display:flex;flex-wrap:wrap;gap:16px">
+          <label><input id="toggle-widget-random" type="checkbox"> Random Student</label>
+          <label><input id="toggle-widget-timer" type="checkbox"> Timer</label>
+          <label><input id="toggle-widget-stopwatch" type="checkbox"> Stopwatch</label>
+          <label><input id="toggle-widget-clock" type="checkbox"> Digital Clock</label>
+        </div>
+        <div style="margin-top:10px">
+          <button onclick="saveSettings()" class="btn-primary">Save Settings</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Manage Emojis Modal -->
+<div id="emoji-modal" class="modal" role="dialog" aria-hidden="true">
+  <div class="modal-card">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h2 style="margin:0">Manage Emoji Avatars</h2>
+      <div>
+        <button onclick="closeManageEmojis()" style="background:#eee;border-radius:8px;padding:8px 10px;border:none;cursor:pointer">Close</button>
+      </div>
+    </div>
+
+    <div style="margin-top:12px">
+      <p class="tiny">These emojis appear in the Add Student and Edit Student emoji picker. Add or remove as you like.</p>
+      <div id="emoji-list" class="emoji-grid" style="margin-top:8px"></div>
+
+      <div style="display:flex;gap:8px;margin-top:10px;align-items:center">
+        <input id="emoji-new" type="text" placeholder="Paste an emoji here" style="padding:8px;border-radius:8px;border:1px solid #e6ecf5">
+        <button onclick="addEmojiToList()" class="btn-primary">Add Emoji</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+
+/* STORAGE KEYS (v9, with fallback to v8 for migration) */
+const STUD_KEY = 'cd_tracker_v9_students';
+const STUD_KEY_PREV = 'cd_tracker_v8_students';
+const GLOBAL_CAT_KEY = 'cd_tracker_v9_global_cats';
+const GLOBAL_CAT_KEY_PREV = 'cd_tracker_v8_global_cats';
+const SETTINGS_KEY = 'cd_tracker_v9_settings';
+const SETTINGS_KEY_PREV = 'cd_tracker_v8_settings';
+const EMOJI_KEY = 'cd_tracker_v9_emojis';
+const EMOJI_KEY_PREV = 'cd_tracker_v8_emojis';
+const ORDER_KEY = 'cd_tracker_v9_order';
+const ORDER_KEY_PREV = 'cd_tracker_v8_order';
+
+/* DEFAULTS (v9) with migration from v8 keys if v9 is empty */
+let students = JSON.parse(localStorage.getItem(STUD_KEY))
+             || JSON.parse(localStorage.getItem(STUD_KEY_PREV))
+             || [];
+let globalCategories = JSON.parse(localStorage.getItem(GLOBAL_CAT_KEY))
+             || JSON.parse(localStorage.getItem(GLOBAL_CAT_KEY_PREV))
+             || [
+  {name:'Key', value:1},
+  {name:'Toilet', value:0},
+  {name:'Kindness', value:1},
+  {name:'Disrespect', value:-1},
+  {name:'Homework', value:1},
+  {name:'Participation', value:1},
+  {name:'Effort', value:1}
+];
+let settings = JSON.parse(localStorage.getItem(SETTINGS_KEY))
+             || JSON.parse(localStorage.getItem(SETTINGS_KEY_PREV))
+             || {
+  classTitle:'Class Points Tracker',
+  logo:null,
+  background:null,
+  widgets: { random:false, timer:false, stopwatch:false, clock:false }
+};
+let emojiList = JSON.parse(localStorage.getItem(EMOJI_KEY))
+             || JSON.parse(localStorage.getItem(EMOJI_KEY_PREV))
+             || ["🦊","🐵","🐯","🐸","🦄","🐼","🐙","🐧","🐶","🐱"];
+
+/* UTIL: file->dataURL */
+function readFileAsDataURL(file, cb){ const r=new FileReader(); r.onload = e => cb(e.target.result); r.readAsDataURL(file); }
+function saveAll(){ localStorage.setItem(STUD_KEY, JSON.stringify(students)); }
+function saveGlobalCats(){ localStorage.setItem(GLOBAL_CAT_KEY, JSON.stringify(globalCategories)); }
+function saveSettingsToStorage(){ localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); }
+function saveEmojiList(){ localStorage.setItem(EMOJI_KEY, JSON.stringify(emojiList)); }
+function saveOrder(){ localStorage.setItem(ORDER_KEY, JSON.stringify(students.map(s=>s.id))); }
+function loadOrderAndReorder(){
+  const order = JSON.parse(localStorage.getItem(ORDER_KEY) || 'null');
+  if(!order || !Array.isArray(order)) return;
+  const byId = Object.fromEntries(students.map(s=>[s.id,s]));
+  const reordered = [];
+  order.forEach(id => { if(byId[id]) { reordered.push(byId[id]); delete byId[id]; } });
+  Object.values(byId).forEach(s => reordered.push(s));
+  students = reordered;
+}
+
+/* INIT header */
+function applySettingsToUI(){
+  document.getElementById('class-title').textContent = settings.classTitle || 'Class Points Tracker';
+  document.getElementById('header-logo').src = settings.logo || 'https://via.placeholder.com/110x44?text=Logo';
+  if(settings.background){
+    document.body.style.backgroundImage = `url('${settings.background}')`;
+  } else {
+    document.body.style.backgroundImage = 'none';
+  }
+  // Sync widget toggles (when opening settings)
+  const w = settings.widgets || {};
+  const tRandom = document.getElementById('toggle-widget-random');
+  const tTimer = document.getElementById('toggle-widget-timer');
+  const tStop = document.getElementById('toggle-widget-stopwatch');
+  const tClock = document.getElementById('toggle-widget-clock');
+  if(tRandom){ tRandom.checked = !!w.random; }
+  if(tTimer){ tTimer.checked = !!w.timer; }
+  if(tStop){ tStop.checked = !!w.stopwatch; }
+  if(tClock){ tClock.checked = !!w.clock; }
+}
+applySettingsToUI();
+
+/* EMOJI -> image generator */
+function emojiToDataURL(emoji, size=256, bgColor='#ffffff'){
+  const canvas = document.createElement('canvas');
+  const d = size;
+  canvas.width = d;
+  canvas.height = d;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = bgColor;
+  ctx.fillRect(0,0,d,d);
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = `${Math.floor(d * 0.64)}px serif`;
+  ctx.fillText(emoji, d/2, d/2 + d*0.02);
+  return canvas.toDataURL('image/png');
+}
+
+/* RENDER emoji grids (add and edit pickers) */
+function renderAddEmojiGrid(){
+  const container = document.getElementById('add-emoji-grid');
+  container.innerHTML = '';
+  emojiList.forEach((em, i) => {
+    const tile = document.createElement('div');
+    tile.className = 'emoji-tile';
+    tile.textContent = em;
+    tile.title = em;
+    tile.addEventListener('click', ()=> {
+      const prev = container.querySelector('.selected');
+      if(prev) prev.classList.remove('selected');
+      tile.classList.add('selected');
+      container.setAttribute('data-selected-index', i);
+    });
+    container.appendChild(tile);
+  });
+}
+function renderEditEmojiGrid(){
+  const container = document.getElementById('edit-emoji-grid');
+  container.innerHTML = '';
+  emojiList.forEach((em, i) => {
+    const tile = document.createElement('div');
+    tile.className = 'emoji-tile';
+    tile.textContent = em;
+    tile.title = em;
+    tile.addEventListener('click', ()=> {
+      const prev = container.querySelector('.selected');
+      if(prev) prev.classList.remove('selected');
+      tile.classList.add('selected');
+      container.setAttribute('data-selected-index', i);
+    });
+    container.appendChild(tile);
+  });
+}
+function renderManageEmojiList(){
+  const container = document.getElementById('emoji-list');
+  container.innerHTML = '';
+  emojiList.forEach((em, i) => {
+    const wrapper = document.createElement('div');
+    wrapper.style.display = 'flex';
+    wrapper.style.alignItems = 'center';
+    wrapper.style.gap = '6px';
+
+    const tile = document.createElement('div');
+    tile.className = 'emoji-tile';
+    tile.textContent = em;
+    tile.title = em;
+
+    const rm = document.createElement('button');
+    rm.textContent = '×';
+    rm.style.marginLeft='6px';
+    rm.style.border='none'; rm.style.background='transparent'; rm.style.cursor='pointer';
+    rm.title='Remove';
+    rm.addEventListener('click', ()=> {
+      if(!confirm('Remove this emoji?')) return;
+      emojiList.splice(i,1);
+      saveEmojiList();
+      renderAddEmojiGrid(); renderEditEmojiGrid(); renderManageEmojiList();
+    });
+    wrapper.appendChild(tile);
+    wrapper.appendChild(rm);
+    container.appendChild(wrapper);
+  });
+}
+
+/* SOUND: WebAudio synthesized (offline) */
+const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+function playPositiveSound(){
+  const now = audioCtx.currentTime;
+  const o1 = audioCtx.createOscillator();
+  const o2 = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  o1.type='sine'; o2.type='sine';
+  o1.frequency.setValueAtTime(880, now);
+  o2.frequency.setValueAtTime(1320, now);
+  g.gain.setValueAtTime(0.0001, now);
+  g.gain.exponentialRampToValueAtTime(0.12, now + 0.002);
+  g.gain.exponentialRampToValueAtTime(0.0001, now + 0.42);
+  const f = audioCtx.createBiquadFilter(); f.type='highpass'; f.frequency.value=400;
+  o1.connect(f); o2.connect(f); f.connect(g); g.connect(audioCtx.destination);
+  o1.start(now); o2.start(now); o1.stop(now+0.45); o2.stop(now+0.45);
+}
+function playNegativeSound(){
+  const now = audioCtx.currentTime;
+  const o = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  const f = audioCtx.createBiquadFilter();
+  o.type='triangle';
+  o.frequency.setValueAtTime(220, now);
+  o.frequency.exponentialRampToValueAtTime(90, now + 0.35);
+  g.gain.setValueAtTime(0.0001, now);
+  g.gain.exponentialRampToValueAtTime(0.16, now + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, now + 0.55);
+  f.type='lowpass'; f.frequency.value=1000;
+  o.connect(f); f.connect(g); g.connect(audioCtx.destination);
+  o.start(now); o.stop(now + 0.55);
+}
+
+/* ADD STUDENT + IDs (needed for ordering) */
+function generateId(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
+function addStudent(){
+  const nameEl = document.getElementById('new-name');
+  const genderEl = document.getElementById('new-gender');
+  const fileEl = document.getElementById('new-image');
+  const name = (nameEl.value||'').trim();
+  const gender = genderEl.value || 'other';
+  if(!name){ alert('Please enter a student name'); return; }
+  if(students.some(s => s.name.toLowerCase() === name.toLowerCase())){
+    if(!confirm('A student with this name exists. Add anyway?')) return;
+  }
+  const createStudent = (imgData) => {
+    const id = generateId();
+    const newStu = {
+      id,
+      name,
+      image: imgData || null,
+      points: 0,
+      history: [],
+      categories: JSON.parse(JSON.stringify(globalCategories)),
+      gender
+    };
+    students.push(newStu);
+    saveAll();
+    saveOrder();
+    renderGrid();
+    nameEl.value=''; fileEl.value=''; genderEl.value='boy';
+    const addGrid = document.getElementById('add-emoji-grid');
+    addGrid.removeAttribute('data-selected-index');
+    const sel = addGrid.querySelector('.selected'); if(sel) sel.classList.remove('selected');
+  };
+
+  if(fileEl.files && fileEl.files[0]){
+    readFileAsDataURL(fileEl.files[0], createStudent);
+    return;
+  }
+  const addGrid = document.getElementById('add-emoji-grid');
+  const selIdx = addGrid.getAttribute('data-selected-index');
+  if(selIdx !== null && selIdx !== undefined && selIdx !== ''){
+    const emoji = emojiList[Number(selIdx)] || emojiList[0];
+    const dataUrl = emojiToDataURL(emoji);
+    createStudent(dataUrl);
+    return;
+  }
+  const fallbackEmoji = emojiList[0];
+  const dataUrl = emojiToDataURL(fallbackEmoji);
+  createStudent(dataUrl);
+}
+
+/* Sortable (drag & drop) */
+let sortableInstance = null;
+function initSortable(){
+  if(sortableInstance) { sortableInstance.destroy(); sortableInstance = null; }
+  sortableInstance = Sortable.create(document.getElementById('student-list'), {
+    animation: 180,
+    handle: '.drag-handle',
+    draggable: '.student-card',
+    onEnd: () => {
+      const container = document.getElementById('student-list');
+      const nodes = Array.from(container.querySelectorAll('.student-card'));
+      const newOrderIds = nodes.map(n => n.getAttribute('data-id'));
+      const byId = Object.fromEntries(students.map(s=>[s.id,s]));
+      students = newOrderIds.map(id => byId[id]).filter(Boolean);
+      const remaining = Object.values(byId).filter(s => !newOrderIds.includes(s.id));
+      students = students.concat(remaining);
+      saveAll();
+      saveOrder();
+      renderGrid();
+    },
+    onChoose: (evt) => { evt.item.classList.add('dragging'); },
+    onUnchoose: (evt) => { evt.item.classList.remove('dragging'); }
+  });
+}
+
+/* RENDER GRID */
+function renderGrid(){
+  loadOrderAndReorder();
+  const container = document.getElementById('student-list');
+  container.innerHTML = '';
+  // render in stored order (manual)
+  students.forEach((stu, idx) => {
+    const card = document.createElement('div');
+    card.className = 'student-card';
+    // Apply per-student background colour
+    try { card.style.background = getBgColor((stu && stu.bg) || 'white'); } catch(e) {}
+    card.setAttribute('data-index', idx);
+    card.setAttribute('data-id', stu.id);
+
+    // drag handle
+    const handle = document.createElement('div');
+    handle.className = 'drag-handle';
+    handle.innerHTML = '⋮⋮';
+    handle.title = 'Drag to reorder';
+    card.appendChild(handle);
+
+    const inner = document.createElement('div');
+    inner.className = 'card-inner';
+
+    const badge = document.createElement('div');
+    badge.className = 'points-badge';
+    badge.textContent = stu.points;
+    card.appendChild(badge);
+
+    const img = document.createElement('img');
+    img.className = 'avatar';
+    img.src = stu.image || 'https://via.placeholder.com/300?text=No+Image';
+    img.alt = stu.name || 'student';
+    img.addEventListener('click', (ev)=>{ ev.stopPropagation(); openPointModal(idx); });
+    img.addEventListener('dblclick', (ev)=>{ ev.stopPropagation(); changeStudentPic(idx); });
+    inner.appendChild(img);
+
+    const nameEl = document.createElement('div');
+    nameEl.className = 'student-name';
+    nameEl.textContent = stu.name || 'Unnamed';
+    nameEl.addEventListener('click', (ev)=>{ ev.stopPropagation(); openEditModal(idx); });
+
+    inner.appendChild(nameEl);
+    card.appendChild(inner);
+    card.addEventListener('click', ()=> openPointModal(idx));
+    container.appendChild(card);
+  });
+  // render widgets (top)
+  renderWidgets();
+  // (re)init sortable after DOM updated
+  setTimeout(initSortable, 0);
+}
+
+/* POINT MODAL */
+const pointModal = document.getElementById('point-modal');
+let activeIndex = null;
+
+function openPointModal(index){
+  activeIndex = index;
+  const s = students[index];
+  if(!s) return;
+  document.getElementById('modal-avatar').src = s.image || 'https://via.placeholder.com/300?text=No+Image';
+  document.getElementById('modal-name').textContent = s.name;
+  document.getElementById('modal-points').textContent = `${s.points} points`;
+
+  const catContainer = document.getElementById('modal-categories');
+  catContainer.innerHTML = '';
+  (s.categories||[]).forEach((c)=>{
+    const btn = document.createElement('div');
+    btn.className = 'cat-btn';
+    btn.innerHTML = `<div class="cat-label"><strong>${escapeHtml(c.name)}</strong><small class="tiny">${c.value>0?'+':''}${c.value}</small></div>
+                     <div class="cat-value">${c.value>0?'+':''}${c.value}</div>`;
+    btn.addEventListener('click', ()=> {
+      addPointsToStudent(index, Number(c.value), c.name);
+    });
+    catContainer.appendChild(btn);
+  });
+
+  const hist = document.getElementById('modal-history');
+  hist.innerHTML = '';
+  (s.history||[]).slice().reverse().forEach(h=>{
+    const li = document.createElement('li');
+    li.textContent = `${h.date} - ${h.category} (${h.change>0?'+':''}${h.change})`;
+    hist.appendChild(li);
+  });
+
+  pointModal.classList.add('open');
+  pointModal.setAttribute('aria-hidden','false');
+}
+
+function addPointsToStudent(index, value, category){
+  const s = students[index];
+  if(!s) return;
+  try { if(audioCtx.state === 'suspended') audioCtx.resume(); } catch(e){}
+  if(Number(value) > 0) playPositiveSound();
+  else if(Number(value) < 0) playNegativeSound();
+
+  s.points += Number(value);
+  s.history = s.history || [];
+  s.history.push({category: category||'Custom', change: Number(value), date: new Date().toLocaleString()});
+  saveAll();
+  // Return to home after awarding
+  closePointModal();
+  renderGrid();
+}
+
+function closePointModal(){ pointModal.classList.remove('open'); pointModal.setAttribute('aria-hidden','true'); activeIndex = null; }
+document.getElementById('point-open-edit').addEventListener('click', ()=>{ if(activeIndex!==null) openEditModal(activeIndex); });
+pointModal.addEventListener('click', (e)=>{ if(e.target === pointModal) closePointModal(); });
+
+/* EDIT STUDENT */
+const editModal = document.getElementById('edit-modal');
+let editingIndex = null;
+
+function openEditModal(index){
+  editingIndex = index;
+  const s = students[index];
+  if(!s) return;
+  document.getElementById('edit-avatar').src = s.image || 'https://via.placeholder.com/300?text=No+Image';
+  document.getElementById('edit-name').value = s.name || '';
+  document.getElementById('edit-gender').value = s.gender || 'other';
+  setupBgChoiceUI('edit-bg-choices', s.bg || 'white');
+  renderCatEditor(s.categories || []);
+  renderEditEmojiGrid();
+  editModal.classList.add('open');
+  editModal.setAttribute('aria-hidden','false');
+}
+
+function closeEditModal(){ editModal.classList.remove('open'); editModal.setAttribute('aria-hidden','true'); editingIndex = null; document.getElementById('edit-image').value=''; }
+
+/* change picture via edit modal */
+document.getElementById('edit-image').addEventListener('change', (ev)=>{
+  const file = ev.target.files[0];
+  if(!file || editingIndex === null) return;
+  readFileAsDataURL(file, (dataUrl)=>{
+    students[editingIndex].image = dataUrl;
+    document.getElementById('edit-avatar').src = dataUrl;
+    saveAll(); renderGrid(); if(activeIndex === editingIndex) openPointModal(editingIndex);
+  });
+});
+
+/* pick emoji in edit modal */
+document.getElementById('edit-emoji-grid').addEventListener('click', ()=>{
+  const sel = document.getElementById('edit-emoji-grid').getAttribute('data-selected-index');
+  if(sel !== null && sel !== undefined && sel !== ''){
+    const em = emojiList[Number(sel)];
+    const dataUrl = emojiToDataURL(em);
+    if(editingIndex !== null){
+      students[editingIndex].image = dataUrl;
+      document.getElementById('edit-avatar').src = dataUrl;
+      saveAll(); renderGrid(); if(activeIndex === editingIndex) openPointModal(editingIndex);
+      document.getElementById('edit-emoji-grid').removeAttribute('data-selected-index');
+      const prev = document.getElementById('edit-emoji-grid').querySelector('.selected'); if(prev) prev.classList.remove('selected');
+    }
+  }
+});
+
+/* change picture quick from grid */
+function changeStudentPic(index){
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  input.onchange = e => {
+    const file = e.target.files[0];
+    if(!file) return;
+    readFileAsDataURL(file, (dataUrl)=>{
+      students[index].image = dataUrl;
+      saveAll(); renderGrid(); if(activeIndex === index) openPointModal(index);
+    });
+  };
+  input.click();
+}
+
+/* category editor UI */
+function renderCatEditor(catArray){
+  const list = document.getElementById('cat-list');
+  list.innerHTML = '';
+  (catArray||[]).forEach((c,i)=>{
+    const row = document.createElement('div');
+    row.className = 'row';
+    row.style.display='flex'; row.style.gap='8px'; row.style.marginBottom='8px'; row.style.alignItems='center';
+
+    const nameIn = document.createElement('input');
+    nameIn.type='text'; nameIn.value=c.name; nameIn.style.flex='1';
+    nameIn.addEventListener('input', ()=>{
+      students[editingIndex].categories[i].name = nameIn.value;
+      saveAll();
+      if(activeIndex === editingIndex) openPointModal(editingIndex);
+      renderGrid();
+    });
+
+    const valIn = document.createElement('input');
+    valIn.type='number'; valIn.value=c.value; valIn.style.width='110px';
+    valIn.addEventListener('input', ()=>{
+      students[editingIndex].categories[i].value = Number(valIn.value);
+      saveAll();
+      if(activeIndex === editingIndex) openPointModal(editingIndex);
+      renderGrid();
+    });
+
+    const removeBtn = document.createElement('button');
+    removeBtn.className='remove'; removeBtn.textContent='Remove';
+    removeBtn.addEventListener('click', ()=>{
+      if(!confirm('Remove this category from student?')) return;
+      students[editingIndex].categories.splice(i,1);
+      saveAll();
+      renderCatEditor(students[editingIndex].categories);
+      if(activeIndex === editingIndex) openPointModal(editingIndex);
+      renderGrid();
+    });
+
+    row.appendChild(nameIn); row.appendChild(valIn); row.appendChild(removeBtn);
+    list.appendChild(row);
+  });
+}
+
+function addCategoryToStudent(){
+  if(editingIndex === null) return;
+  const n = document.getElementById('new-cat-name').value.trim();
+  const v = Number(document.getElementById('new-cat-value').value || 0);
+  if(!n){ alert('Category name required'); return; }
+  students[editingIndex].categories.push({name:n, value:v});
+  document.getElementById('new-cat-name').value=''; document.getElementById('new-cat-value').value='';
+  saveAll();
+  renderCatEditor(students[editingIndex].categories);
+  if(activeIndex === editingIndex) openPointModal(editingIndex);
+}
+
+/* save edits */
+function saveStudentEdits(){
+  if(editingIndex === null) return;
+  const nm = document.getElementById('edit-name').value.trim();
+  const gender = document.getElementById('edit-gender').value || 'other';
+  if(!nm){ alert('Name cannot be empty'); return; }
+  students[editingIndex].name = nm;
+  students[editingIndex].gender = gender;
+  students[editingIndex].bg = getSelectedBgFromUI('edit-bg-choices') || 'white';
+  saveAll();
+  renderGrid();
+  closeEditModal();
+  if(activeIndex === editingIndex) openPointModal(editingIndex);
+}
+
+/* delete student */
+function deleteCurrentStudent(){
+  if(editingIndex===null) return;
+  if(!confirm('Delete this student permanently?')) return;
+  const deletedId = students[editingIndex].id;
+  students.splice(editingIndex,1);
+  saveAll();
+  // update order (remove id)
+  const order = JSON.parse(localStorage.getItem(ORDER_KEY) || '[]').filter(id => id !== deletedId);
+  localStorage.setItem(ORDER_KEY, JSON.stringify(order));
+  renderGrid();
+  closeEditModal(); closePointModal();
+}
+
+/* CLASS MANAGEMENT */
+const classMgmtModal = document.getElementById('class-mgmt-modal');
+document.getElementById('open-class-management').addEventListener('click', openClassManagement);
+function openClassManagement(){ classMgmtModal.classList.add('open'); classMgmtModal.setAttribute('aria-hidden','false'); }
+function closeClassManagement(){ classMgmtModal.classList.remove('open'); classMgmtModal.setAttribute('aria-hidden','true'); }
+
+/* Reset all points */
+function resetAllPoints(){
+  if(!confirm('Reset all students points to 0?')) return;
+  students.forEach(s => {
+    s.points = 0;
+    s.history = s.history || [];
+    s.history.push({category:'Reset', change: 0, date: new Date().toLocaleString()});
+  });
+  saveAll(); renderGrid(); alert('All points reset to 0.');
+}
+
+/* MANAGE GLOBAL CATEGORIES */
+const globalCatModal = document.getElementById('global-cat-modal');
+function openManageCategories(){ renderGlobalCats(); globalCatModal.classList.add('open'); globalCatModal.setAttribute('aria-hidden','false'); }
+function closeGlobalCategories(){ globalCatModal.classList.remove('open'); globalCatModal.setAttribute('aria-hidden','true'); }
+function renderGlobalCats(){
+  const list = document.getElementById('global-cat-list');
+  list.innerHTML='';
+  globalCategories.forEach((c,i)=>{
+    const row = document.createElement('div');
+    row.className='row';
+    row.style.display='flex'; row.style.gap='8px'; row.style.alignItems='center'; row.style.marginBottom='8px';
+    const nameIn = document.createElement('input'); nameIn.type='text'; nameIn.value=c.name; nameIn.style.flex='1';
+    const valIn = document.createElement('input'); valIn.type='number'; valIn.value=c.value; valIn.style.width='110px';
+    nameIn.addEventListener('input', ()=> { globalCategories[i].name = nameIn.value; });
+    valIn.addEventListener('input', ()=> { globalCategories[i].value = Number(valIn.value); });
+    const rm = document.createElement('button'); rm.className='remove'; rm.textContent='Remove';
+    rm.addEventListener('click', ()=>{ if(!confirm('Remove this global category?')) return; globalCategories.splice(i,1); renderGlobalCats(); });
+    row.appendChild(nameIn); row.appendChild(valIn); row.appendChild(rm);
+    list.appendChild(row);
+  });
+}
+function addGlobalCategory(){
+  const n = document.getElementById('global-new-name').value.trim();
+  const v = Number(document.getElementById('global-new-value').value || 0);
+  if(!n){ alert('Category name required'); return; }
+  globalCategories.push({name:n, value:v});
+  document.getElementById('global-new-name').value=''; document.getElementById('global-new-value').value='';
+  renderGlobalCats();
+}
+function saveGlobalCategories(){ saveGlobalCats(); alert('Global categories saved. New students will use these categories (existing students unchanged).'); closeGlobalCategories(); }
+
+/* GIVE POINTS TO GROUP */
+const giveGroupModal = document.getElementById('give-group-modal');
+function openGivePointsGroup(){
+  const sel = document.getElementById('group-category');
+  sel.innerHTML = '';
+  globalCategories.forEach((c, i) => {
+    const opt = document.createElement('option'); opt.value = i; opt.textContent = `${c.name} (${c.value>0?'+':''}${c.value})`;
+    sel.appendChild(opt);
+  });
+  giveGroupModal.classList.add('open'); giveGroupModal.setAttribute('aria-hidden','false');
+}
+function closeGivePointsGroup(){ giveGroupModal.classList.remove('open'); giveGroupModal.setAttribute('aria-hidden','true'); }
+
+function applyPointsToGroup(){
+  const target = document.getElementById('group-target').value;
+  const catIndex = Number(document.getElementById('group-category').value);
+  const times = Math.max(1, Number(document.getElementById('group-times').value || 1));
+  const cat = globalCategories[catIndex];
+  if(!cat){ alert('Please select a category'); return; }
+  let affected = 0;
+  try { if(audioCtx.state === 'suspended') audioCtx.resume(); } catch(e){}
+  for(let s of students){
+    if(target === 'all' || s.gender === target){
+      for(let i=0;i<times;i++){
+        s.points += Number(cat.value);
+        s.history = s.history || [];
+        s.history.push({category: cat.name, change: Number(cat.value), date: new Date().toLocaleString()});
+      }
+      affected++;
+    }
+  }
+  if(cat.value > 0) playPositiveSound();
+  else if(cat.value < 0) playNegativeSound();
+
+  saveAll(); renderGrid();
+  alert(`Applied "${cat.name}" x${times} to ${affected} students.`);
+  closeGivePointsGroup();
+}
+
+/* SETTINGS (heading, logo, background, widgets) */
+const settingsModal = document.getElementById('settings-modal');
+function openSettings(){
+  document.getElementById('setting-title').value = settings.classTitle || '';
+  document.getElementById('preview-logo').src = settings.logo || 'https://via.placeholder.com/110x44?text=Logo';
+  // sync checkboxes
+  const w = settings.widgets || {};
+  document.getElementById('toggle-widget-random').checked = !!w.random;
+  document.getElementById('toggle-widget-timer').checked = !!w.timer;
+  document.getElementById('toggle-widget-stopwatch').checked = !!w.stopwatch;
+  document.getElementById('toggle-widget-clock').checked = !!w.clock;
+
+  settingsModal.classList.add('open'); settingsModal.setAttribute('aria-hidden','false');
+}
+function closeSettings(){ settingsModal.classList.remove('open'); settingsModal.setAttribute('aria-hidden','true'); }
+
+document.getElementById('setting-logo').addEventListener('change', (ev)=>{
+  const f = ev.target.files[0];
+  if(!f) return;
+  readFileAsDataURL(f, dataUrl => {
+    document.getElementById('preview-logo').src = dataUrl;
+    settings.logo = dataUrl;
+  });
+});
+
+document.getElementById('setting-bg').addEventListener('change', (ev)=>{
+  const f = ev.target.files[0];
+  if(!f) return;
+  readFileAsDataURL(f, dataUrl => {
+    settings.background = dataUrl;
+    document.body.style.backgroundImage = `url('${dataUrl}')`;
+  });
+});
+
+function clearBackground(){ settings.background = null; document.body.style.backgroundImage = 'none'; alert('Background removed (will be removed on save).'); }
+
+function saveSettings(){
+  const newTitle = document.getElementById('setting-title').value.trim();
+  if(newTitle) settings.classTitle = newTitle;
+
+  // widgets
+  settings.widgets = {
+    random: document.getElementById('toggle-widget-random').checked,
+    timer: document.getElementById('toggle-widget-timer').checked,
+    stopwatch: document.getElementById('toggle-widget-stopwatch').checked,
+    clock: document.getElementById('toggle-widget-clock').checked
+  };
+
+  saveSettingsToStorage();
+  applySettingsToUI();
+  renderWidgets(); // refresh widgets live
+  closeSettings();
+  alert('Settings saved.');
+}
+
+/* MANAGE EMOJIS */
+const emojiModal = document.getElementById('emoji-modal');
+function openManageEmojis(){ renderManageEmojiList(); emojiModal.classList.add('open'); emojiModal.setAttribute('aria-hidden','false'); }
+function closeManageEmojis(){ emojiModal.classList.remove('open'); emojiModal.setAttribute('aria-hidden','true'); }
+
+function addEmojiToList(){
+  const input = document.getElementById('emoji-new');
+  const val = (input.value||'').trim();
+  if(!val){ alert('Paste an emoji into the box and press Add'); return; }
+  const emojiChar = Array.from(val)[0];
+  emojiList.unshift(emojiChar);
+  saveEmojiList();
+  input.value='';
+  renderAddEmojiGrid(); renderEditEmojiGrid(); renderManageEmojiList();
+}
+
+/* WIDGETS IMPLEMENTATION */
+let clockInterval = null;
+let timerInterval = null;
+let stopwatchInterval = null;
+
+let timerRemainingMs = 0;
+let timerRunning = false;
+
+let stopwatchStart = null;
+let stopwatchElapsed = 0;
+let stopwatchRunning = false;
+
+function formatHMS(ms){
+  const totalSec = Math.max(0, Math.floor(ms/1000));
+  const h = Math.floor(totalSec / 3600);
+  const m = Math.floor((totalSec % 3600) / 60);
+  const s = totalSec % 60;
+  return (h>0 ? String(h).padStart(2,'0')+':' : '') + String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+}
+
+function renderWidgets(){
+  const container = document.getElementById('widgets-container');
+  container.innerHTML = '';
+  const w = settings.widgets || {};
+  clearIntervals();
+
+  // Random Student
+  if(w.random){
+    const card = document.createElement('div');
+    card.className = 'widget';
+    card.innerHTML = `
+      <h3>Random Student</h3>
+      <div class="row" style="gap:10px">
+        <button class="btn" id="btn-pick-random">Pick Random Student</button>
+        <div id="random-result" class="row" style="gap:8px"></div>
+      </div>
+    `;
+    container.appendChild(card);
+    card.querySelector('#btn-pick-random').addEventListener('click', ()=>{
+      if(students.length === 0){ alert('No students yet.'); return; }
+      const idx = Math.floor(Math.random()*students.length);
+      const s = students[idx];
+      const result = card.querySelector('#random-result');
+      result.innerHTML = `
+        <img src="${s.image || 'https://via.placeholder.com/60'}" alt="" style="width:40px;height:40px;border-radius:50%;object-fit:cover;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.08)">
+        <strong style="cursor:pointer">${s.name}</strong>
+      `;
+      // clicking the name opens point modal for convenience
+      result.querySelector('strong').addEventListener('click', ()=>{
+        openPointModal(idx);
+      });
+      // small visual pulse
+      result.style.transition='transform 140ms ease';
+      result.style.transform='scale(1.06)';
+      setTimeout(()=>{ result.style.transform='scale(1)'; }, 150);
+    });
+  }
+
+  // Timer
+  if(w.timer){
+    const card = document.createElement('div');
+    card.className = 'widget';
+    card.innerHTML = `
+      <h3>Timer</h3>
+      <div class="row">
+        <label class="tiny">Min</label><input id="timer-min" type="number" min="0" value="0">
+        <label class="tiny">Sec</label><input id="timer-sec" type="number" min="0" max="59" value="30">
+        <button class="btn" id="timer-set">Set</button>
+      </div>
+      <div class="row" style="margin-top:8px;gap:8px;align-items:center">
+        <div id="timer-display" class="display">00:30</div>
+        <button class="btn" id="timer-start">Start</button>
+        <button class="btn" id="timer-pause" style="background:#6c757d">Pause</button>
+        <button class="btn" id="timer-reset" style="background:#6c757d">Reset</button>
+      </div>
+    `;
+    container.appendChild(card);
+
+    const disp = card.querySelector('#timer-display');
+    const minIn = card.querySelector('#timer-min');
+    const secIn = card.querySelector('#timer-sec');
+
+    function updateDisplay(){ disp.textContent = formatHMS(timerRemainingMs).padStart(5,'0'); }
+    function setFromInputs(){
+      const min = Math.max(0, parseInt(minIn.value || '0',10));
+      let sec = Math.max(0, parseInt(secIn.value || '0',10));
+      sec = Math.min(59, sec);
+      timerRemainingMs = (min*60 + sec)*1000;
+      updateDisplay();
+    }
+    card.querySelector('#timer-set').addEventListener('click', ()=>{
+      setFromInputs();
+    });
+    card.querySelector('#timer-start').addEventListener('click', ()=>{
+      if(timerRunning) return;
+      if(timerRemainingMs <= 0) setFromInputs();
+      timerRunning = true;
+      try{ if(audioCtx.state==='suspended') audioCtx.resume(); }catch(e){}
+      timerInterval = setInterval(()=>{
+        timerRemainingMs -= 200;
+        if(timerRemainingMs <= 0){
+          timerRemainingMs = 0;
+          updateDisplay();
+          clearInterval(timerInterval);
+          timerRunning = false;
+          playPositiveSound();
+          // quick flash
+          disp.style.background='#d1e7dd'; disp.style.borderColor='#a3cfbb';
+          setTimeout(()=>{ disp.style.background='#fff'; disp.style.borderColor='#e9eef7'; }, 600);
+        } else {
+          updateDisplay();
+        }
+      }, 200);
+    });
+    card.querySelector('#timer-pause').addEventListener('click', ()=>{
+      clearInterval(timerInterval); timerRunning=false;
+    });
+    card.querySelector('#timer-reset').addEventListener('click', ()=>{
+      clearInterval(timerInterval); timerRunning=false;
+      setFromInputs();
+    });
+    // init
+    setFromInputs(); updateDisplay();
+  }
+
+  // Stopwatch
+  if(w.stopwatch){
+    const card = document.createElement('div');
+    card.className = 'widget';
+    card.innerHTML = `
+      <h3>Stopwatch</h3>
+      <div class="row" style="gap:8px;align-items:center">
+        <div id="sw-display" class="display">00:00</div>
+        <button class="btn" id="sw-start">Start</button>
+        <button class="btn" id="sw-stop" style="background:#6c757d">Stop</button>
+        <button class="btn" id="sw-reset" style="background:#6c757d">Reset</button>
+      </div>
+    `;
+    container.appendChild(card);
+    const disp = card.querySelector('#sw-display');
+
+    function renderSW(){
+      const ms = (stopwatchRunning ? (Date.now() - stopwatchStart + stopwatchElapsed) : stopwatchElapsed);
+      disp.textContent = formatHMS(ms);
+    }
+    card.querySelector('#sw-start').addEventListener('click', ()=>{
+      if(stopwatchRunning) return;
+      stopwatchRunning = true;
+      stopwatchStart = Date.now();
+      stopwatchInterval = setInterval(renderSW, 200);
+    });
+    card.querySelector('#sw-stop').addEventListener('click', ()=>{
+      if(!stopwatchRunning) return;
+      stopwatchRunning = false;
+      stopwatchElapsed += Date.now() - stopwatchStart;
+      clearInterval(stopwatchInterval);
+      renderSW();
+    });
+    card.querySelector('#sw-reset').addEventListener('click', ()=>{
+      stopwatchRunning = false;
+      stopwatchElapsed = 0;
+      clearInterval(stopwatchInterval);
+      renderSW();
+    });
+    renderSW();
+  }
+
+  // Digital Clock
+  if(w.clock){
+    const card = document.createElement('div');
+    card.className = 'widget';
+    card.innerHTML = `
+      <h3>Digital Clock</h3>
+      <div id="clock-display" class="display">--:--:--</div>
+    `;
+    container.appendChild(card);
+    const disp = card.querySelector('#clock-display');
+    function tick(){
+      const d = new Date();
+      const hh = String(d.getHours()).padStart(2,'0');
+      const mm = String(d.getMinutes()).padStart(2,'0');
+      const ss = String(d.getSeconds()).padStart(2,'0');
+      disp.textContent = `${hh}:${mm}:${ss}`;
+    }
+    tick();
+    clockInterval = setInterval(tick, 1000);
+  }
+}
+
+function clearIntervals(){
+  if(clockInterval){ clearInterval(clockInterval); clockInterval=null; }
+  if(timerInterval){ clearInterval(timerInterval); timerInterval=null; timerRunning=false; }
+  if(stopwatchInterval){ clearInterval(stopwatchInterval); stopwatchInterval=null; }
+}
+
+/* UTILS */
+function getBgColor(name){
+  switch(String(name||'white').toLowerCase()){
+    case 'blue': return '#e7f0ff';
+    case 'green': return '#eaf7ea';
+    case 'red': return '#ffefef';
+    case 'yellow': return '#fffbe6';
+    case 'purple': return '#f3e8ff';
+    case 'orange': return '#fff1e6';
+    case 'gold': return '#fff4cc';
+    default: return '#ffffff';
+  }
+}
+function setupBgChoiceUI(containerId, current){
+  const root = document.getElementById(containerId);
+  if(!root) return;
+  const items = Array.from(root.querySelectorAll('.bg-choice'));
+  function setChecked(val){
+    items.forEach(btn => {
+      const on = String(btn.dataset.value||'white') === String(val||'white');
+      btn.setAttribute('aria-checked', on ? 'true' : 'false');
+      btn.tabIndex = on ? 0 : -1;
+    });
+  }
+  setChecked(current||'white');
+  items.forEach(btn => {
+    btn.addEventListener('click', () => {
+      setChecked(btn.dataset.value);
+    });
+    btn.addEventListener('keydown', (e) => {
+      if(e.key === 'Enter' || e.key === ' '){
+        e.preventDefault();
+        setChecked(btn.dataset.value);
+      }
+    });
+  });
+}
+function getSelectedBgFromUI(containerId){
+  const root = document.getElementById(containerId);
+  if(!root) return 'white';
+  const sel = root.querySelector('.bg-choice[aria-checked="true"]');
+  return sel ? (sel.dataset.value||'white') : 'white';
+}
+
+
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, function(m){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]; }); }
+
+/* bind header clicks */
+document.getElementById('class-title').addEventListener('click', openClassManagement);
+document.getElementById('header-logo').addEventListener('click', openSettings);
+
+/* close modals on outside click */
+[document.getElementById('edit-modal'), document.getElementById('global-cat-modal'),
+ document.getElementById('class-mgmt-modal'), document.getElementById('give-group-modal'),
+ document.getElementById('settings-modal'), document.getElementById('emoji-modal')].forEach(mod => {
+  mod.addEventListener('click', (e)=>{ if(e.target === mod) mod.classList.remove('open'); });
+});
+
+/* point modal close */
+pointModal.addEventListener('click', (e)=>{ if(e.target === pointModal) closePointModal(); });
+
+/* Ensure IDs for migrations from older versions */
+function ensureStudentIds(){
+  let changed = false;
+  for(let s of students){
+    if(!s.id){ s.id = generateId(); changed = true; }
+    if(!('bg' in s)){ s.bg = 'white'; changed = true; }
+  }
+  if(changed) { saveAll(); saveOrder(); }
+}
+
+/* final boot */
+ensureStudentIds();
+renderGrid();
+renderAddEmojiGrid();
+renderEditEmojiGrid();
+renderManageEmojiList();
+</script>
+</body>
+</html>
